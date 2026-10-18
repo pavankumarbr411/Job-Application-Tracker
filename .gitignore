@@ -1,0 +1,20 @@
+@"
+# Python
+__pycache__/
+*.py[cod]
+venv/
+backend/venv/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Local database
+backend/jobtrack.db
+backend/*.db
+
+# Node.js
+frontend/node_modules/
+frontend/dist/
+"@ | Set-Content .gitignore
