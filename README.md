@@ -125,8 +125,4 @@ The core application and local Docker setup have been developed and tested. Furt
 - Add further automated integration tests
 - Improve database backup and persistence practices
 
-## Author
 
-Pavan Kumar B. R.
-
-GitHub: https://github.com/pavankumarbr411
