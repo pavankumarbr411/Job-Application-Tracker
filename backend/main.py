@@ -18,8 +18,9 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 
 # Database
-DATABASE_URL = (
-    f"sqlite:///{(Path(__file__).resolve().parent / 'jobtrack.db').as_posix()}"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"sqlite:///{(Path(__file__).resolve().parent / 'jobtrack.db').as_posix()}",
 )
 engine = create_engine(
     DATABASE_URL,

@@ -1,0 +1,30 @@
+
+services:
+  backend:
+    build:
+      context: ./backend
+    image: jobtrack-backend
+    container_name: jobtrack-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - jobtrack_data:/app/data
+    environment:
+      DATABASE_URL: sqlite:////app/data/jobtrack.db
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    image: jobtrack-frontend
+    container_name: jobtrack-frontend
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+
+volumes:
+  jobtrack_data:

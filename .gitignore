@@ -1,5 +1,4 @@
-@"
-# Python
+﻿# Python
 __pycache__/
 *.py[cod]
 venv/
@@ -17,4 +16,7 @@ backend/*.db
 # Node.js
 frontend/node_modules/
 frontend/dist/
-"@ | Set-Content .gitignore
+
+# Git and editor files
+.vscode/
+.idea/
