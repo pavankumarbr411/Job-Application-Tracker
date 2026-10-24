@@ -20,3 +20,9 @@ frontend/dist/
 # Git and editor files
 .vscode/
 .idea/
+
+# Local dependency backup
+node_modules_old_backup/
+
+# Local test output
+frontend/test-results.txt

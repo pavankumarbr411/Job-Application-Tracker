@@ -14,7 +14,6 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import "./App.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 const TOKEN_KEY = "jobtrack_token";
@@ -466,7 +465,42 @@ function Dashboard() {
   }
 
   useEffect(() => {
-    loadJobs();
+    let cancelled = false;
+
+    async function fetchJobs() {
+      try {
+        const response = await apiRequest("/jobs");
+
+        if (!response.ok) {
+          throw new Error("Unable to load applications.");
+        }
+
+        const data = await response.json();
+
+        if (!cancelled) {
+          setJobs(data);
+          setError("");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err.message === "Failed to fetch"
+              ? "Cannot connect to FastAPI. Check the backend."
+              : err.message
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchJobs();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleSubmit(e) {
