@@ -86,18 +86,22 @@ pipeline {
                     def approval = input(
                         message: 'All CI checks passed. Approve JobTrack deployment?',
                         ok: 'Approve Deployment',
-                        submitterParameter: 'DEPLOY_APPROVER'
+                        submitterParameter: 'DEPLOY_APPROVER',
+                        parameters: []
                     )
 
-                    if (!(approval instanceof Map) ||
-                        !approval.DEPLOY_APPROVER?.trim()) {
+                    def approver = approval instanceof Map
+                        ? approval.get('DEPLOY_APPROVER')
+                        : approval
+
+                    if (!approver?.toString()?.trim()) {
                         error(
-                            'Approver identity was not recorded. Deployment cancelled.'
+                            'Deployment cancelled: approver identity is missing.'
                         )
                     }
 
                     env.DEPLOY_APPROVED_BY =
-                        approval.DEPLOY_APPROVER.trim()
+                        approver.toString().trim()
 
                     echo "Deployment approved by: ${env.DEPLOY_APPROVED_BY}"
                 }
