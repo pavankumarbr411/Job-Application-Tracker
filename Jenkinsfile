@@ -32,6 +32,7 @@ pipeline {
                 sh 'test -f frontend/package.json'
                 sh 'test -f frontend/package-lock.json'
                 sh 'test -f docker-compose.yml'
+
                 echo 'Required project files found'
             }
         }
@@ -82,17 +83,21 @@ pipeline {
         stage('Deployment Approval') {
             steps {
                 script {
-                    input(
+                    def approval = input(
                         message: 'All CI checks passed. Approve JobTrack deployment?',
                         ok: 'Approve Deployment',
                         submitterParameter: 'DEPLOY_APPROVER'
                     )
 
-                    if (!env.DEPLOY_APPROVER?.trim()) {
-                        error('Approver identity was not recorded. Deployment cancelled.')
+                    if (!(approval instanceof Map) ||
+                        !approval.DEPLOY_APPROVER?.trim()) {
+                        error(
+                            'Approver identity was not recorded. Deployment cancelled.'
+                        )
                     }
 
-                    env.DEPLOY_APPROVED_BY = env.DEPLOY_APPROVER
+                    env.DEPLOY_APPROVED_BY =
+                        approval.DEPLOY_APPROVER.trim()
 
                     echo "Deployment approved by: ${env.DEPLOY_APPROVED_BY}"
                 }
@@ -147,8 +152,10 @@ with open(os.environ["TEMP_FILE"], "w") as f:
         }
 
         always {
-            archiveArtifacts artifacts: 'frontend/dist/**',
-                             allowEmptyArchive: true
+            archiveArtifacts(
+                artifacts: 'frontend/dist/**',
+                allowEmptyArchive: true
+            )
         }
     }
 }
