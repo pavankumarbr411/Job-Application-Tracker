@@ -26,3 +26,5 @@ node_modules_old_backup/
 
 # Local test output
 frontend/test-results.txt
+backups/
+jenkins-agent/

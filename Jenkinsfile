@@ -80,13 +80,27 @@ pipeline {
         }
     }
 
+   
     post {
         success {
-            echo 'JobTrack CI passed all checks.'
+            sh '''
+                set -eu
+
+                COMMIT="$(git rev-parse HEAD)"
+                REQUEST="/home/jenkins/agent/deploy-request.json"
+                TEMP="/home/jenkins/agent/deploy-request.json.tmp"
+
+                printf '{"commit":"%s"}\n' "$COMMIT" > "$TEMP"
+                mv "$TEMP" "$REQUEST"
+
+                echo "Deployment request created for commit: $COMMIT"
+            '''
+
+            echo 'JobTrack CI passed all checks and the deployment request was created.'
         }
 
         failure {
-            echo 'JobTrack CI failed. Review the stage logs.'
+            echo 'JobTrack CI failed. No deployment request will be created.'
         }
 
         always {
@@ -94,4 +108,5 @@ pipeline {
                              allowEmptyArchive: true
         }
     }
+
 }
