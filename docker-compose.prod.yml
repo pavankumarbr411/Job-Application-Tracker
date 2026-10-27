@@ -1,0 +1,10 @@
+services:
+  backend:
+    ports: !reset []
+    environment:
+      DATABASE_URL: sqlite:////app/data/jobtrack.db
+      JOBTRACK_SECRET_KEY: ${JOBTRACK_SECRET_KEY:?Set JOBTRACK_SECRET_KEY on the server}
+
+  frontend:
+    ports: !reset
+      - "80:80"
