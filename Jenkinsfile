@@ -78,29 +78,72 @@ pipeline {
                 }
             }
         }
+
+        stage('Deployment Approval') {
+            steps {
+                script {
+                    input(
+                        message: 'All CI checks passed. Approve JobTrack deployment?',
+                        ok: 'Approve Deployment',
+                        submitterParameter: 'DEPLOY_APPROVER'
+                    )
+
+                    if (!env.DEPLOY_APPROVER?.trim()) {
+                        error('Approver identity was not recorded. Deployment cancelled.')
+                    }
+
+                    env.DEPLOY_APPROVED_BY = env.DEPLOY_APPROVER
+
+                    echo "Deployment approved by: ${env.DEPLOY_APPROVED_BY}"
+                }
+            }
+        }
     }
 
-   
     post {
         success {
             sh '''
                 set -eu
 
                 COMMIT="$(git rev-parse HEAD)"
+                APPROVER="${DEPLOY_APPROVED_BY:-}"
+
+                if [ -z "$APPROVER" ]; then
+                    echo "ERROR: No deployment approver recorded."
+                    exit 1
+                fi
+
                 REQUEST="/home/jenkins/agent/deploy-request.json"
                 TEMP="/home/jenkins/agent/deploy-request.json.tmp"
 
-                printf '{"commit":"%s"}\n' "$COMMIT" > "$TEMP"
+                export COMMIT APPROVER
+                export TEMP_FILE="$TEMP"
+
+                python3 -c '
+import json
+import os
+
+request = {
+    "commit": os.environ["COMMIT"],
+    "approvedBy": os.environ["APPROVER"]
+}
+
+with open(os.environ["TEMP_FILE"], "w") as f:
+    json.dump(request, f)
+    f.write("\\n")
+'
+
                 mv "$TEMP" "$REQUEST"
 
-                echo "Deployment request created for commit: $COMMIT"
+                echo "Approved deployment request created for commit: $COMMIT"
+                echo "Approver: $APPROVER"
             '''
 
             echo 'JobTrack CI passed all checks and the deployment request was created.'
         }
 
         failure {
-            echo 'JobTrack CI failed. No deployment request will be created.'
+            echo 'JobTrack CI failed or was aborted. No new deployment request will be created.'
         }
 
         always {
@@ -108,5 +151,4 @@ pipeline {
                              allowEmptyArchive: true
         }
     }
-
 }
