@@ -107,6 +107,30 @@ pipeline {
                 }
             }
         }
+
+        stage('Test AWS SSH Connection') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'jobtrack-ec2-ssh',
+                        keyFileVariable: 'EC2_SSH_KEY',
+                        usernameVariable: 'EC2_SSH_USER'
+                    )
+                ]) {
+                    sh '''
+                        set -eu
+
+                        ssh \
+                          -i "$EC2_SSH_KEY" \
+                          -o BatchMode=yes \
+                          -o ConnectTimeout=10 \
+                          -o StrictHostKeyChecking=yes \
+                          "$EC2_SSH_USER@16.178.119.173" \
+                          "echo SSH_CONNECTION_SUCCESSFUL"
+                    '''
+                }
+            }
+        }
     }
 
     post {
