@@ -108,7 +108,8 @@ pipeline {
             }
         }
 
-        stage('Test AWS SSH Connection') {
+
+        stage('Deploy to AWS EC2') {
             steps {
                 withCredentials([
                     sshUserPrivateKey(
@@ -120,17 +121,77 @@ pipeline {
                     sh '''
                         set -eu
 
+                        COMMIT="$(git rev-parse HEAD)"
+
+                        echo "Deploying approved commit: $COMMIT"
+
                         ssh \
                           -i "$EC2_SSH_KEY" \
                           -o BatchMode=yes \
                           -o ConnectTimeout=10 \
                           -o StrictHostKeyChecking=yes \
                           "$EC2_SSH_USER@54.153.219.122" \
-                          "echo SSH_CONNECTION_SUCCESSFUL"
+                          "bash -s -- '$COMMIT'" <<'REMOTE_SCRIPT'
+set -eu
+
+COMMIT="$1"
+APP_DIR="/home/ubuntu/JobTrack/app"
+
+case "$COMMIT" in
+    *[!0-9a-f]*|'')
+        echo "ERROR: Invalid commit SHA"
+        exit 1
+        ;;
+esac
+
+if [ "${#COMMIT}" -ne 40 ]; then
+    echo "ERROR: Expected a full 40-character commit SHA"
+    exit 1
+fi
+
+cd "$APP_DIR"
+
+git fetch origin "$COMMIT"
+git checkout --detach "$COMMIT"
+
+docker compose \
+    -f docker-compose.yml \
+    -f docker-compose.prod.yml \
+    --env-file /home/ubuntu/jobtrack.env \
+    config --quiet
+
+docker compose \
+    -f docker-compose.yml \
+    -f docker-compose.prod.yml \
+    --env-file /home/ubuntu/jobtrack.env \
+    up -d --build
+
+echo "Waiting for JobTrack frontend..."
+
+for attempt in $(seq 1 30); do
+    if curl --fail --silent --show-error \
+        http://127.0.0.1/ -o /dev/null 2>/dev/null; then
+        echo "Deployment health check passed."
+        exit 0
+    fi
+
+    sleep 2
+done
+
+echo "ERROR: Frontend health check failed."
+docker compose \
+    -f docker-compose.yml \
+    -f docker-compose.prod.yml \
+    --env-file /home/ubuntu/jobtrack.env \
+    ps
+
+exit 1
+REMOTE_SCRIPT
                     '''
                 }
             }
         }
+
     }
 
     post {
