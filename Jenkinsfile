@@ -32,6 +32,7 @@ pipeline {
                 sh 'test -f frontend/package.json'
                 sh 'test -f frontend/package-lock.json'
                 sh 'test -f docker-compose.yml'
+                sh 'test -f docker-compose.prod.yml'
 
                 echo 'Required project files found'
             }
@@ -108,7 +109,6 @@ pipeline {
             }
         }
 
-
         stage('Deploy to AWS EC2') {
             steps {
                 withCredentials([
@@ -136,6 +136,7 @@ set -eu
 
 COMMIT="$1"
 APP_DIR="/home/ubuntu/JobTrack/app"
+ENV_FILE="/home/ubuntu/jobtrack.env"
 
 case "$COMMIT" in
     *[!0-9a-f]*|'')
@@ -151,93 +152,128 @@ fi
 
 cd "$APP_DIR"
 
-git fetch origin "$COMMIT"
+# Remember the currently deployed source revision.
+PREVIOUS_COMMIT="$(git rev-parse HEAD)"
+echo "Previous revision: $PREVIOUS_COMMIT"
+echo "Target revision:   $COMMIT"
+
+# Fetch the approved revision from GitHub.
+git fetch origin main
+
+git cat-file -e "$COMMIT^{commit}" || {
+    echo "ERROR: Approved commit is not available locally."
+    exit 1
+}
+
+# Restore the previous revision if deployment fails.
+rollback_deployment() {
+    echo "Attempting rollback to $PREVIOUS_COMMIT"
+
+    git checkout --detach "$PREVIOUS_COMMIT" || return 1
+
+    docker compose \
+        -f docker-compose.yml \
+        -f docker-compose.prod.yml \
+        --env-file "$ENV_FILE" \
+        config --quiet || return 1
+
+    docker compose \
+        -f docker-compose.yml \
+        -f docker-compose.prod.yml \
+        --env-file "$ENV_FILE" \
+        up -d --build || return 1
+
+    for attempt in $(seq 1 30); do
+        if curl --fail --silent \
+            http://127.0.0.1/ -o /dev/null; then
+            echo "Previous revision restored successfully."
+            return 0
+        fi
+
+        sleep 2
+    done
+
+    echo "ERROR: Rollback health check failed."
+    return 1
+}
+
+# Select the exact commit that passed CI.
 git checkout --detach "$COMMIT"
 
-docker compose \
+# Validate before touching running services.
+if ! docker compose \
     -f docker-compose.yml \
     -f docker-compose.prod.yml \
-    --env-file /home/ubuntu/jobtrack.env \
-    config --quiet
+    --env-file "$ENV_FILE" \
+    config --quiet; then
 
-docker compose \
+    echo "ERROR: Production configuration is invalid."
+    git checkout --detach "$PREVIOUS_COMMIT"
+    exit 1
+fi
+
+# Build and start the new version.
+if ! docker compose \
     -f docker-compose.yml \
     -f docker-compose.prod.yml \
-    --env-file /home/ubuntu/jobtrack.env \
-    up -d --build
+    --env-file "$ENV_FILE" \
+    up -d --build; then
 
-echo "Waiting for JobTrack frontend..."
+    echo "ERROR: Deployment command failed."
+
+    if ! rollback_deployment; then
+        echo "CRITICAL: Automatic rollback failed. Manual recovery is required."
+    fi
+
+    exit 1
+fi
+
+# Verify that the frontend responds.
+echo "Checking JobTrack frontend..."
+
+HEALTHY=0
 
 for attempt in $(seq 1 30); do
-    if curl --fail --silent --show-error \
-        http://127.0.0.1/ -o /dev/null 2>/dev/null; then
-        echo "Deployment health check passed."
-        exit 0
+    if curl --fail --silent \
+        http://127.0.0.1/ -o /dev/null; then
+        HEALTHY=1
+        break
     fi
 
     sleep 2
 done
 
-echo "ERROR: Frontend health check failed."
-docker compose \
-    -f docker-compose.yml \
-    -f docker-compose.prod.yml \
-    --env-file /home/ubuntu/jobtrack.env \
-    ps
+if [ "$HEALTHY" -ne 1 ]; then
+    echo "ERROR: New deployment failed its health check."
 
-exit 1
+    if ! rollback_deployment; then
+        echo "CRITICAL: Automatic rollback failed. Manual recovery is required."
+    fi
+
+    exit 1
+fi
+
+echo "Deployment health check passed."
+echo "Successfully deployed revision: $COMMIT"
 REMOTE_SCRIPT
                     '''
                 }
             }
         }
-
     }
 
     post {
         success {
-            sh '''
-                set -eu
-
-                COMMIT="$(git rev-parse HEAD)"
-                APPROVER="${DEPLOY_APPROVED_BY:-}"
-
-                if [ -z "$APPROVER" ]; then
-                    echo "ERROR: No deployment approver recorded."
-                    exit 1
-                fi
-
-                REQUEST="/home/jenkins/agent/deploy-request.json"
-                TEMP="/home/jenkins/agent/deploy-request.json.tmp"
-
-                export COMMIT APPROVER
-                export TEMP_FILE="$TEMP"
-
-                python3 -c '
-import json
-import os
-
-request = {
-    "commit": os.environ["COMMIT"],
-    "approvedBy": os.environ["APPROVER"]
-}
-
-with open(os.environ["TEMP_FILE"], "w") as f:
-    json.dump(request, f)
-    f.write("\\n")
-'
-
-                mv "$TEMP" "$REQUEST"
-
-                echo "Approved deployment request created for commit: $COMMIT"
-                echo "Approver: $APPROVER"
-            '''
-
-            echo 'JobTrack CI passed all checks and the deployment request was created.'
+            echo 'JobTrack CI passed and the approved deployment completed successfully.'
+            echo "Deployment approver: ${env.DEPLOY_APPROVED_BY}"
         }
 
         failure {
-            echo 'JobTrack CI failed or was aborted. No new deployment request will be created.'
+            echo 'JobTrack pipeline failed. Check the console output and deployment recovery messages.'
+        }
+
+        aborted {
+            echo 'JobTrack pipeline was aborted. Check whether deployment had already started.'
         }
 
         always {
@@ -248,4 +284,3 @@ with open(os.environ["TEMP_FILE"], "w") as f:
         }
     }
 }
-
