@@ -1,128 +1,228 @@
-# JobTrack – Job Application Tracker
+# JobTrack — Job Application Tracker
 
-JobTrack is a full-stack web application developed to help users organize and track their job applications. This project was built to practice full-stack development, REST API integration, automated testing, and Docker containerization.
+JobTrack is a full-stack web application that helps users organize and track their job applications in one place. The project demonstrates full-stack development, automated testing, Docker containerization, and CI/CD deployment to AWS EC2.
+
+## Project Overview
+
+- **Frontend:** React, Vite, JavaScript
+- **Backend:** Python, FastAPI
+- **Database:** SQLite
+- **Authentication:** JWT-based authentication
+- **Testing:** Vitest, Pytest
+- **Containerization:** Docker, Docker Compose
+- **Web server / reverse proxy:** Nginx
+- **CI/CD:** Jenkins
+- **Cloud:** AWS EC2
+- **Version control:** Git and GitHub
 
 ## Features
 
 - User registration and login
 - JWT-based authentication
-- Job application management
+- Create, view, update, and delete job applications
+- User-specific job application data
 - React-based user interface
 - REST API built with FastAPI
-- SQLite database integration
-- Backend and frontend automated tests
-- Docker containers for the frontend and backend
-- Docker Compose for running the application locally
-- Nginx configuration for frontend hosting and API proxying
+- Persistent SQLite database using a Docker volume
+- Automated frontend and backend tests
+- Dockerized frontend and backend services
+- Nginx reverse proxy for API requests
+- Jenkins pipeline for validation, testing, building, and deployment
+- Manual approval before production deployment
+- Deployment health checks and rollback logic
 
-## Tech Stack
+## Technology Stack
 
-**Frontend**
-- React
-- Vite
-- JavaScript
-- Tailwind CSS
-- React Router
+| Area            | Technologies                          |
+| --------------- | ------------------------------------- |
+| Frontend        | React, Vite, JavaScript, Tailwind CSS |
+| Backend         | Python, FastAPI, SQLAlchemy           |
+| Database        | SQLite                                |
+| Authentication  | JWT                                   |
+| Testing         | Vitest, Pytest                        |
+| DevOps          | Jenkins, Docker, Docker Compose       |
+| Web server      | Nginx                                 |
+| Cloud           | AWS EC2                               |
+| Version control | Git, GitHub                           |
 
-**Backend**
-- Python
-- FastAPI
-- SQLAlchemy
-- SQLite
-- JWT authentication
+## Architecture
 
-**Testing and DevOps**
-- Pytest
-- Vitest
-- Docker
-- Docker Compose
-- Nginx
-- Git and GitHub
-
-## Project Architecture
-
-The application uses a containerized frontend and backend.
+The application uses separate frontend and backend Docker containers.
 
 1. The user accesses the React frontend through a web browser.
-2. Nginx serves the frontend and forwards API requests to the backend.
-3. FastAPI processes requests and interacts with the SQLite database.
-4. Docker Compose manages the frontend and backend containers.
+2. Nginx serves the frontend and proxies `/api/` requests to FastAPI.
+3. FastAPI handles authentication and job application API requests.
+4. SQLAlchemy interacts with the SQLite database.
+5. Docker Compose manages the frontend and backend services.
+6. A Docker volume stores the database so that rebuilding containers does not normally remove application data.
+
+### Architecture flow
+
+```text
+User / Browser
+      |
+      v
+AWS EC2 Instance
+      |
+      v
+Nginx (Frontend Container)
+      |
+      |---- Serves React frontend
+      |
+      |---- /api/ requests
+                 |
+                 v
+          FastAPI Backend
+                 |
+                 v
+          SQLAlchemy ORM
+                 |
+                 v
+            SQLite DB
+        (Docker Volume)
+```
+
+## CI/CD Pipeline
+
+The Jenkins pipeline automates the main validation and deployment steps.
+
+1. **Checkout:** Retrieves the source code from GitHub.
+2. **Environment validation:** Checks Git, Node.js, npm, and Python.
+3. **Project validation:** Verifies required project files.
+4. **Frontend tests:** Runs Vitest tests.
+5. **Frontend lint:** Checks frontend code quality.
+6. **Frontend build:** Creates the production frontend build.
+7. **Backend tests:** Runs Pytest with coverage reporting.
+8. **Manual approval:** Waits for approval before deployment.
+9. **Deployment:** Connects to AWS EC2 over SSH and deploys the approved Git commit using Docker Compose.
+10. **Health check and recovery:** Checks whether the frontend responds and attempts to restore the previous revision if deployment fails.
+
+The production deployment uses a separate Docker Compose override file and a server-side environment file for the application secret.
+
+## Testing Results
+
+The following results were recorded in the successful Jenkins CI run:
+
+- Frontend tests: **7 passed**
+- Backend tests: **13 passed**
+- Frontend lint: Passed
+- Frontend production build: Passed
+- Backend coverage: Approximately 91%
+- Production Docker Compose configuration: Valid
+- Deployment: Successful
+
+These results describe the tested project revision and its recorded pipeline run.
 
 ## Run Locally with Docker
 
 ### Prerequisites
-- Docker Desktop
+
 - Git
+- Docker Desktop with Docker Compose
 
-### Steps
+### 1. Clone the repository
 
-1. Clone the repository:
+```bash
+git clone https://github.com/pavankumarbr411/JobTrack.git
+cd JobTrack
+```
 
-   ```bash
-   git clone https://github.com/pavankumarbr411/JobTrack.git
-   cd JobTrack
-   ```
+### 2. Build and start the application
 
-2. Start the application:
+```bash
+docker compose up -d --build
+```
 
-   ```bash
-   docker compose up -d --build
-   ```
+### 3. Open the application
 
-3. Open the frontend:
+Frontend:
 
-   http://localhost:8081
+```text
+http://localhost:8081
+```
 
-4. Open the FastAPI Swagger documentation:
+FastAPI Swagger documentation:
 
-   http://localhost:8000/docs
+```text
+http://localhost:8000/docs
+```
 
-### Stop the application
+### 4. Stop the application
 
 ```bash
 docker compose stop
 ```
 
-To start it again:
+### 5. Start it again
 
 ```bash
 docker compose start
 ```
 
-## Testing
+To stop and remove the containers without removing the named database volume:
 
-The following tests were passing during development:
+```bash
+docker compose down
+```
 
-- Backend: 13 tests passed
-- Frontend: 7 tests passed
-- Frontend production build: successful
+**Important:** Avoid `docker compose down -v` if you want to preserve the local database volume.
 
-These results reflect the development environment at the time of testing. Run the tests again if you change the code.
+## AWS Deployment
+
+JobTrack has been deployed to an AWS EC2 Ubuntu instance using Docker Compose.
+
+The production setup includes:
+
+- Separate frontend and backend containers
+- Nginx serving the frontend and proxying API requests
+- Persistent SQLite storage using a Docker volume
+- Server-side environment configuration for the secret key
+- Jenkins-triggered deployment over SSH
+- Manual deployment approval
+- Frontend health checks and rollback logic
+
+The current demo address is:
+
+[http://54.153.219.122](http://54.153.219.122)
+
+The application currently uses HTTP, not HTTPS. The public IP may change if the EC2 instance is stopped and restarted without an Elastic IP. The demo may therefore be unavailable when the instance is stopped.
+
+## Repository Structure
+
+```text
+JobTrack/
+├── backend/
+│   ├── tests/
+│   ├── requirements.txt
+│   └── ...
+├── frontend/
+│   ├── src/
+│   ├── package.json
+│   └── ...
+├── docker-compose.yml
+├── docker-compose.prod.yml
+├── Jenkinsfile
+└── README.md
+```
 
 ## Learning Outcomes
 
 Through this project, I gained practical experience with:
 
-- Developing a React frontend and FastAPI backend
-- Integrating frontend and backend APIs
-- Implementing authentication
-- Working with relational databases and SQLAlchemy
-- Writing automated tests
-- Building Docker images
-- Running multiple services with Docker Compose
+- Building a full-stack web application
+- Developing and integrating REST APIs
+- Implementing authentication and user data isolation
+- Using SQLAlchemy with SQLite
+- Writing frontend and backend automated tests
+- Building and managing Docker containers
 - Configuring Nginx as a reverse proxy
-- Managing source code using Git and GitHub
+- Creating a Jenkins CI/CD pipeline
+- Deploying an application to AWS EC2
+- Using deployment health checks and rollback logic
 
-## Current Status
+## Future Maintenance
 
-The core application and local Docker setup have been developed and tested. Further improvements, including Jenkins-based CI/CD automation and AWS deployment, remain planned.
+The core application and CI/CD deployment are complete. Potential operational improvements include configuring HTTPS, automated database backups, and monitoring.
 
-## Future Improvements
-
-- Configure a Jenkins CI/CD pipeline
-- Deploy the application to AWS EC2
-- Improve production configuration and secrets management
-- Add further automated integration tests
-- Improve database backup and persistence practices
-
+##
 
