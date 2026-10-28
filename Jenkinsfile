@@ -125,7 +125,7 @@ pipeline {
                           -o BatchMode=yes \
                           -o ConnectTimeout=10 \
                           -o StrictHostKeyChecking=yes \
-                          "$EC2_SSH_USER@16.178.119.173" \
+                          "$EC2_SSH_USER@54.153.219.122" \
                           "echo SSH_CONNECTION_SUCCESSFUL"
                     '''
                 }
@@ -187,3 +187,4 @@ with open(os.environ["TEMP_FILE"], "w") as f:
         }
     }
 }
+
